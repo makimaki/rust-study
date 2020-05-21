@@ -18,6 +18,7 @@ struct LineConfig {
 }
 
 const SIGNATURE_HEADER_NAME: &str = "X-Line-Signature";
+const REPLY_API_ENDPOINT: &str = "https://api.line.me/v2/bot/message/reply";
 
 async fn handle_webhook_request(req: HttpRequest, /*path: web::Path<webhook::PathInfo>, */body: String) -> impl Responder {
     let line_config = match envy::prefixed("LINE_").from_env::<LineConfig>() {
@@ -158,7 +159,7 @@ async fn send_reply(config: &LineConfig, reply_request: &reply::Request) -> () {
     //    .await;
 
     let result = reqwest::Client::new()
-        .post("https://api.line.me/v2/bot/message/reply")
+        .post(REPLY_API_ENDPOINT)
         .bearer_auth(&config.channel_access_token)
         .json(reply_request)
         .send()
