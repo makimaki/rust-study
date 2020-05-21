@@ -26,7 +26,7 @@ async fn handle_webhook_request(req: HttpRequest, /*path: web::Path<webhook::Pat
         }
     };
 
-    if validator::validate(line_config.channel_secret, &req, &body) {
+    if validator::validate(&line_config.channel_secret, &req, &body) {
         let webhook_request: webhook::Request = serde_json::from_str(&body).unwrap();
         for event in &webhook_request.events {
             match handle_event(event) {

@@ -5,7 +5,7 @@ use base64;
 
 const SIGNATURE_HEADER_NAME: &str = "X-Line-Signature";
 
-pub fn validate(channel_secret: String, request: &HttpRequest, body: &str) -> bool {
+pub fn validate(channel_secret: &String, request: &HttpRequest, body: &str) -> bool {
     println!(r"
 header: {:?}
 body: {:?}
