@@ -1,16 +1,13 @@
-use actix_web::HttpRequest;
 use sha2::Sha256;
 use hmac::{Hmac, Mac};
 use base64;
 
-const SIGNATURE_HEADER_NAME: &str = "X-Line-Signature";
-
-pub fn validate(channel_secret: &String, request: &HttpRequest, body: &str) -> bool {
+pub fn validate(channel_secret: &String, signature: &Option<&str>, body: &str) -> bool {
     println!(r"
-header: {:?}
+signature: {:?}
 body: {:?}
 ",
-        &request.headers(),
+        &signature,
         &body
     );
 
@@ -23,8 +20,8 @@ body: {:?}
     let computed = base64::encode(&code_bytes);
     println!("{:?}", computed);
 
-    match request.headers().get(SIGNATURE_HEADER_NAME) {
-        Some(value) => value.to_str().unwrap() == computed,
+    match *signature {
+        Some(value) => value == computed,
         None => false,
     }
 }

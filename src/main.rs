@@ -17,6 +17,8 @@ struct LineConfig {
     channel_secret: String
 }
 
+const SIGNATURE_HEADER_NAME: &str = "X-Line-Signature";
+
 async fn handle_webhook_request(req: HttpRequest, /*path: web::Path<webhook::PathInfo>, */body: String) -> impl Responder {
     let line_config = match envy::prefixed("LINE_").from_env::<LineConfig>() {
         Ok(val) => val,
@@ -26,7 +28,9 @@ async fn handle_webhook_request(req: HttpRequest, /*path: web::Path<webhook::Pat
         }
     };
 
-    if validator::validate(&line_config.channel_secret, &req, &body) {
+    let signature = &req.headers().get(SIGNATURE_HEADER_NAME).as_ref().map(|v| v.to_str().unwrap());
+
+    if validator::validate(&line_config.channel_secret, signature, &body) {
         let webhook_request: webhook::Request = serde_json::from_str(&body).unwrap();
         for event in &webhook_request.events {
             match handle_event(event) {
