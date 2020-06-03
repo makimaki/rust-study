@@ -24,7 +24,7 @@ async fn handle_webhook_request(req: HttpRequest, /*path: web::Path<webhook::Pat
     let line_config = match envy::prefixed("LINE_").from_env::<LineConfig>() {
         Ok(val) => val,
         Err(err) => {
-            println!("{}", err);
+            println!("cannot read config from environment variables, {}", err);
             std::process::exit(1);
         }
     };
