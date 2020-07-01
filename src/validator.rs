@@ -3,7 +3,7 @@ use hmac::{Hmac, Mac};
 use base64;
 
 pub fn validate(channel_secret: &String, signature: &Option<&str>, body: &str) -> bool {
-    println!(r"
+    info!(r"
 signature: {:?}
 body: {:?}
 ",
@@ -18,7 +18,7 @@ body: {:?}
     let result = mac.result();
     let code_bytes = result.code();
     let computed = base64::encode(&code_bytes);
-    println!("{:?}", computed);
+    info!("{:?}", computed);
 
     match *signature {
         Some(value) => value == computed,

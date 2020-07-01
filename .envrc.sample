@@ -1,2 +1,3 @@
 export LINE_CHANNEL_ACCESS_TOKEN=xxxx
 export LINE_CHANNEL_SECRET=xxx
+export LINE_REPLY_API_ENDPOINT="https://api.line.me/v2/bot/message/reply"

@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate log;
 extern crate env_logger;
 
 use actix_web::{/*client::Client, */middleware, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
@@ -14,36 +16,42 @@ mod validator;
 #[derive(Deserialize, Debug)]
 struct LineConfig {
     channel_access_token: String,
-    channel_secret: String
+    channel_secret: String,
+    reply_api_endpoint: String,
 }
 
 const SIGNATURE_HEADER_NAME: &str = "X-Line-Signature";
-const REPLY_API_ENDPOINT: &str = "https://api.line.me/v2/bot/message/reply";
 
 async fn handle_webhook_request(req: HttpRequest, /*path: web::Path<webhook::PathInfo>, */body: String) -> impl Responder {
     let line_config = match envy::prefixed("LINE_").from_env::<LineConfig>() {
         Ok(val) => val,
         Err(err) => {
-            println!("cannot read config from environment variables, {}", err);
+            error!("cannot read config from environment variables, {}", err);
             std::process::exit(1);
         }
     };
 
     let signature = &req.headers().get(SIGNATURE_HEADER_NAME).as_ref().map(|v| v.to_str().unwrap());
 
+    let mut response = "".to_string();
     if validator::validate(&line_config.channel_secret, signature, &body) {
         let webhook_request: webhook::Request = serde_json::from_str(&body).unwrap();
         for event in &webhook_request.events {
             match handle_event(event) {
-                Some(res) => send_reply(&line_config, &res).await,
+                Some(res) => {
+                    if &line_config.reply_api_endpoint == "direct" {
+                        response = serde_json::to_string(&res).unwrap();
+                    }
+                    send_reply(&line_config, &res).await
+                },
                 None => (),
             }
         }
     } else {
-        println!("invalid request");
+        error!("invalid request");
     }
 
-    HttpResponse::Ok()
+    HttpResponse::Ok().body(response)
 }
 
 fn handle_event(event: &webhook::Event) -> Option<reply::Request> {
@@ -96,7 +104,7 @@ fn handle_event(event: &webhook::Event) -> Option<reply::Request> {
                 messages: reply_messages,
             };
 
-            println!("reply: {:?}", reply_request);
+            info!("reply: {:?}", reply_request);
 
             Some(reply_request)
         },
@@ -121,7 +129,7 @@ fn handle_event(event: &webhook::Event) -> Option<reply::Request> {
             Some(reply_request)
         },
         _ => {
-            println!("not implements. event: {:?}", &event);
+            info!("not implements. event: {:?}", &event);
             None
         },
     }
@@ -129,7 +137,7 @@ fn handle_event(event: &webhook::Event) -> Option<reply::Request> {
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "actix_web=debug");
+    std::env::set_var("RUST_LOG", "info,actix_web=debug");
     env_logger::init();
     
     let mut listenfd = ListenFd::from_env();
@@ -138,7 +146,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .data(web::JsonConfig::default().limit(4096))
             .route("/webhook/{client_id}/{integration_id}", web::post().to(handle_webhook_request))
-            .route("/status", web::get().to(|| HttpResponse::Ok()))
+            .route("/status", web::get().to(|| HttpResponse::Ok().body("ok")))
     });
 
     server = if let Some(l) = listenfd.take_tcp_listener(0).unwrap() {
@@ -152,18 +160,19 @@ async fn main() -> std::io::Result<()> {
 
 async fn send_reply(config: &LineConfig, reply_request: &reply::Request) -> () {
     // Proxy に対応してない模様
-    // let response = Client::default().post("https://api.line.me/v2/bot/message/reply")
+    // let response = Client::default().post(&config.reply_api_endpoint)
     //    .content_type("application/json")
     //    .header("Authorization", format!("Bearer {}", CHANNEL_ACCESS_TOKEN))
     //    .send_json(&reply_request)
     //    .await;
 
+    // TODO: NO_PROXY 対応がまだリリースされていない https://github.com/seanmonstar/reqwest/pull/877
     let result = reqwest::Client::new()
-        .post(REPLY_API_ENDPOINT)
+        .post(&config.reply_api_endpoint)
         .bearer_auth(&config.channel_access_token)
         .json(reply_request)
         .send()
         .await;
 
-    println!("response: {:?}", result)
+    info!("response: {:?}", result)
 }
